@@ -78,7 +78,6 @@ function Search({ onSurahSelect }) {
                 borderBottom: "1px solid var(--border)",
                 background: "none",
                 border: "none",
-                borderBottom: "1px solid var(--border)",
                 cursor: "pointer",
                 textAlign: "left",
               }}

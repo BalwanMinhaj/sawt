@@ -80,6 +80,7 @@ function Onboarding() {
     try {
       await Promise.all(tasks);
       setOnboardingDone();
+      window.dispatchEvent(new Event("sawt:onboarding-done"));
     } catch (err) {
       console.error("Failed to load:", err);
       setLoading(false);
