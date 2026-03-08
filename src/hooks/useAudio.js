@@ -1,23 +1,26 @@
 import { useEffect, useRef, useCallback } from "react";
 import usePlayerStore from "../store/playerStore";
-import { getVerseAudioUrl, getVerseSegments, getActiveWordIndex, getSurahVerseKeys } from "../services/quranData";
+import { getSurahVerseKeys, getSurahAudioUrl, getVerseTimestamp, getVerseSegments, getActiveWordIndex, getActiveVerseKey } from "../services/quranData";
 
 export function useAudio() {
   const audioRef = useRef(new Audio());
-  const preloadRef = useRef(new Audio());
-  const nextVerseRef = useRef(null);
-  const prevVerseRef = useRef(null);
   const shouldPlayRef = useRef(true);
   const activeVerseKeyRef = useRef(null);
+  const currentSurahRef = useRef(null);
+  const nextVerseRef = useRef(null);
+  const prevVerseRef = useRef(null);
 
-  const { surahs, selectedReciter, currentSurah, activeVerseKey, isPlaying, timingsData, scriptData, repeatMode, playbackSpeed, setIsPlaying, setActiveVerseKey, setActiveWordIndex, setProgress, setDuration, setLastPlayed, totalVerses } = usePlayerStore();
+  const { surahs, selectedReciter, currentSurah, activeVerseKey, isPlaying, surahAudioData, segmentsData, scriptData, repeatMode, playbackSpeed, setIsPlaying, setActiveVerseKey, setActiveWordIndex, setProgress, setDuration, setLastPlayed } = usePlayerStore();
 
-  // Keep activeVerseKey in a ref so event handlers always have fresh value
+  // Keep refs fresh
   useEffect(() => {
     activeVerseKeyRef.current = activeVerseKey;
   }, [activeVerseKey]);
+  useEffect(() => {
+    currentSurahRef.current = currentSurah;
+  }, [currentSurah]);
 
-  // Attach audio element to DOM for consistent media session / lock screen
+  // Attach audio to DOM for reliable lock screen / media session
   useEffect(() => {
     const audio = audioRef.current;
     audio.style.display = "none";
@@ -32,29 +35,13 @@ export function useAudio() {
     return getSurahVerseKeys(scriptData, currentSurah);
   }, [scriptData, currentSurah]);
 
-  // Sum verse durations for surah-level position state
-  const getSurahDuration = useCallback(() => {
-    if (!timingsData || !scriptData) return 0;
-    const keys = getSurahVerseKeys(scriptData, currentSurah);
-    return keys.reduce((sum, k) => sum + (timingsData[k]?.duration ?? 0) / 1000, 0);
-  }, [timingsData, scriptData, currentSurah]);
-
-  const getSurahPosition = useCallback(
-    (verseKey, currentTime) => {
-      if (!timingsData || !scriptData) return 0;
-      const keys = getSurahVerseKeys(scriptData, currentSurah);
-      const idx = keys.indexOf(verseKey);
-      const elapsed = keys.slice(0, idx).reduce((sum, k) => sum + (timingsData[k]?.duration ?? 0) / 1000, 0);
-      return elapsed + currentTime;
-    },
-    [timingsData, scriptData, currentSurah],
-  );
-
   const updateMediaSession = useCallback(
     (verseKey) => {
       if (!("mediaSession" in navigator)) return;
       const audio = audioRef.current;
-      const surahName = surahs.find((s) => s.number === parseInt(verseKey.split(":")[0]))?.englishName || "Quran";
+      const surahNum = parseInt(verseKey.split(":")[0]);
+      const surahName = surahs.find((s) => s.number === surahNum)?.englishName || "Quran";
+
       navigator.mediaSession.metadata = new MediaMetadata({
         title: surahName,
         artist: selectedReciter.name,
@@ -70,113 +57,103 @@ export function useAudio() {
       });
       navigator.mediaSession.setActionHandler("nexttrack", () => nextVerseRef.current?.());
       navigator.mediaSession.setActionHandler("previoustrack", () => prevVerseRef.current?.());
+      navigator.mediaSession.setActionHandler("seekto", (e) => {
+        if (e.seekTime !== undefined) {
+          audio.currentTime = e.seekTime;
+        }
+      });
 
-      const total = getSurahDuration();
-      if (total > 0) {
+      // Full surah duration from audio element
+      if (audio.duration > 0) {
         try {
           navigator.mediaSession.setPositionState({
-            duration: total,
+            duration: audio.duration,
             playbackRate: audio.playbackRate || 1,
-            position: getSurahPosition(verseKey, audio.currentTime),
+            position: audio.currentTime,
           });
         } catch (_) {}
       }
     },
-    [surahs, selectedReciter, getSurahDuration, getSurahPosition, setIsPlaying],
+    [surahs, selectedReciter, setIsPlaying],
   );
 
-  const preloadNext = useCallback(
-    (verseKey) => {
-      if (!timingsData || !scriptData) return;
-      const keys = getSurahVerseKeys(scriptData, parseInt(verseKey.split(":")[0]));
-      const nextIndex = keys.indexOf(verseKey) + 1;
-      if (nextIndex < keys.length) {
-        const nextUrl = getVerseAudioUrl(timingsData, keys[nextIndex]);
-        if (nextUrl && preloadRef.current.src !== nextUrl) {
-          preloadRef.current.src = nextUrl;
-          preloadRef.current.preload = "auto";
-          preloadRef.current.load();
-        }
-      }
-    },
-    [timingsData, scriptData],
-  );
-
-  const playVerse = useCallback(
-    (verseKey, seekPercent = 0) => {
-      if (!timingsData) return;
-      const url = getVerseAudioUrl(timingsData, verseKey);
+  // Load surah audio and seek to verse
+  const playSurah = useCallback(
+    (surahNumber, verseKey, seekPercent = 0) => {
+      if (!surahAudioData || !segmentsData) return;
+      const url = getSurahAudioUrl(surahAudioData, surahNumber);
       if (!url) return;
 
       const audio = audioRef.current;
-      audio.pause();
-      audio.oncanplay = null;
       shouldPlayRef.current = true;
 
-      // Use preloaded if available and no seek
-      const preloadUrl = preloadRef.current.src;
-      if (seekPercent === 0 && preloadUrl && (preloadUrl === url || preloadUrl.endsWith(url.split("/").pop())) && preloadRef.current.readyState >= 2) {
-        audio.src = preloadUrl;
-      } else {
-        audio.src = url;
+      // If same surah is already loaded, just seek
+      if (audio.src && (audio.src === url || audio.src.endsWith(url.split("/").pop()))) {
+        const timestamp = getVerseTimestamp(segmentsData, verseKey);
+        if (timestamp) {
+          if (seekPercent > 0) {
+            const keys = getSurahVerseKeys(scriptData, surahNumber);
+            const lastKey = keys[keys.length - 1];
+            const lastTs = getVerseTimestamp(segmentsData, lastKey);
+            const totalDuration = lastTs ? lastTs.to : audio.duration;
+            audio.currentTime = seekPercent * totalDuration;
+          } else {
+            audio.currentTime = timestamp.from;
+          }
+          audio.playbackRate = playbackSpeed;
+          audio.play().catch(() => {});
+          setActiveVerseKey(verseKey);
+          setIsPlaying(true);
+          setLastPlayed(surahNumber, verseKey);
+          updateMediaSession(verseKey);
+        }
+        return;
       }
+
+      // Load new surah
+      audio.pause();
+      audio.oncanplay = null;
+      audio.src = url;
+      audio.preload = "auto";
 
       audio.oncanplay = () => {
         if (!shouldPlayRef.current) return;
-        if (seekPercent > 0) audio.currentTime = seekPercent * (audio.duration || 0);
+        const timestamp = getVerseTimestamp(segmentsData, verseKey);
+        if (timestamp) {
+          if (seekPercent > 0) {
+            audio.currentTime = seekPercent * audio.duration;
+          } else {
+            audio.currentTime = timestamp.from;
+          }
+        }
         audio.playbackRate = playbackSpeed;
         audio.play().catch(() => {});
         updateMediaSession(verseKey);
         audio.oncanplay = null;
-        preloadNext(verseKey);
       };
 
       setActiveVerseKey(verseKey);
       setIsPlaying(true);
-      setLastPlayed(parseInt(verseKey.split(":")[0]), verseKey);
+      setLastPlayed(surahNumber, verseKey);
     },
-    [timingsData, playbackSpeed, setActiveVerseKey, setIsPlaying, setLastPlayed, updateMediaSession, preloadNext],
+    [surahAudioData, segmentsData, scriptData, playbackSpeed, setActiveVerseKey, setIsPlaying, setLastPlayed, updateMediaSession],
+  );
+
+  // playVerse — public API, seeks within current surah audio
+  const playVerse = useCallback(
+    (verseKey, seekPercent = 0) => {
+      const surahNumber = parseInt(verseKey.split(":")[0]);
+      playSurah(surahNumber, verseKey, seekPercent);
+    },
+    [playSurah],
   );
 
   const nextVerse = useCallback(() => {
     const keys = getVerseKeys();
     if (!keys.length) return;
-    const currentKey = activeVerseKeyRef.current;
-    const nextIndex = keys.indexOf(currentKey) + 1;
-
+    const nextIndex = keys.indexOf(activeVerseKeyRef.current) + 1;
     if (nextIndex < keys.length) {
-      const nextKey = keys[nextIndex];
-      const nextUrl = getVerseAudioUrl(timingsData, nextKey);
-      if (!nextUrl) return;
-
-      const audio = audioRef.current;
-      const preload = preloadRef.current;
-
-      if (preload.src && (preload.src === nextUrl || preload.src.endsWith(nextUrl.split("/").pop())) && preload.readyState >= 3) {
-        // Preloaded and ready — swap immediately for minimal gap
-        audio.src = preload.src;
-        audio.playbackRate = playbackSpeed;
-        audio.play().catch(() => {});
-        setActiveVerseKey(nextKey);
-        setIsPlaying(true);
-        setLastPlayed(parseInt(nextKey.split(":")[0]), nextKey);
-        updateMediaSession(nextKey);
-        preloadNext(nextKey);
-      } else {
-        // Fallback
-        audio.src = nextUrl;
-        audio.playbackRate = playbackSpeed;
-        audio.oncanplay = () => {
-          if (!shouldPlayRef.current) return;
-          audio.play().catch(() => {});
-          audio.oncanplay = null;
-          updateMediaSession(nextKey);
-          preloadNext(nextKey);
-        };
-        setActiveVerseKey(nextKey);
-        setIsPlaying(true);
-        setLastPlayed(parseInt(nextKey.split(":")[0]), nextKey);
-      }
+      playVerse(keys[nextIndex]);
     } else {
       if (repeatMode === "all") {
         playVerse(keys[0]);
@@ -186,7 +163,7 @@ export function useAudio() {
         setActiveWordIndex(null);
       }
     }
-  }, [getVerseKeys, timingsData, repeatMode, playbackSpeed, playVerse, setIsPlaying, setActiveVerseKey, setActiveWordIndex, setLastPlayed, updateMediaSession, preloadNext]);
+  }, [getVerseKeys, repeatMode, playVerse, setIsPlaying, setActiveVerseKey, setActiveWordIndex]);
 
   const prevVerse = useCallback(() => {
     const keys = getVerseKeys();
@@ -225,40 +202,56 @@ export function useAudio() {
     }
   }, [isPlaying, playbackSpeed, getVerseKeys, playVerse, setIsPlaying]);
 
-  // Word sync + progress + position state update
+  // timeupdate — track active verse, word, progress
   useEffect(() => {
     const audio = audioRef.current;
 
     const handleTimeUpdate = () => {
-      const vk = activeVerseKeyRef.current;
-      if (!timingsData || !vk) return;
+      if (!segmentsData || !scriptData) return;
       const currentMs = audio.currentTime * 1000;
-      const segments = getVerseSegments(timingsData, vk);
-      setActiveWordIndex(getActiveWordIndex(segments, currentMs));
+      const surahNum = currentSurahRef.current;
+
+      // Detect active verse from timestamp
+      const newVerseKey = getActiveVerseKey(segmentsData, surahNum, currentMs);
+      if (newVerseKey && newVerseKey !== activeVerseKeyRef.current) {
+        setActiveVerseKey(newVerseKey);
+        setLastPlayed(surahNum, newVerseKey);
+        updateMediaSession(newVerseKey);
+      }
+
+      // Word highlighting
+      const vk = newVerseKey || activeVerseKeyRef.current;
+      if (vk) {
+        const segments = getVerseSegments(segmentsData, vk);
+        setActiveWordIndex(getActiveWordIndex(segments, currentMs));
+      }
+
       setProgress(audio.currentTime);
       setDuration(audio.duration || 0);
 
-      // Preload next when 70% through current verse
-      if (audio.duration && audio.currentTime / audio.duration > 0.7) {
-        preloadNext(vk);
-      }
-
-      // Update position state every few seconds
-      if (Math.round(audio.currentTime) % 3 === 0 && "mediaSession" in navigator) {
-        const total = getSurahDuration();
-        if (total > 0) {
-          try {
-            navigator.mediaSession.setPositionState({
-              duration: total,
-              playbackRate: audio.playbackRate || 1,
-              position: getSurahPosition(vk, audio.currentTime),
-            });
-          } catch (_) {}
-        }
+      // Update position state
+      if ("mediaSession" in navigator && audio.duration > 0) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: audio.duration,
+            playbackRate: audio.playbackRate || 1,
+            position: audio.currentTime,
+          });
+        } catch (_) {}
       }
     };
 
-    const handleEnded = () => nextVerseRef.current?.();
+    const handleEnded = () => {
+      if (repeatMode === "all") {
+        // Replay surah from beginning
+        const keys = getVerseKeys();
+        if (keys.length) playVerse(keys[0]);
+      } else {
+        setIsPlaying(false);
+        setActiveVerseKey(null);
+        setActiveWordIndex(null);
+      }
+    };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
@@ -266,7 +259,7 @@ export function useAudio() {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [timingsData, preloadNext, getSurahDuration, getSurahPosition, setActiveWordIndex, setProgress, setDuration]);
+  }, [segmentsData, scriptData, repeatMode, getVerseKeys, playVerse, updateMediaSession, setActiveVerseKey, setActiveWordIndex, setProgress, setDuration, setIsPlaying, setLastPlayed]);
 
   // Stop when surah changes
   useEffect(() => {
@@ -274,7 +267,6 @@ export function useAudio() {
     shouldPlayRef.current = false;
     audio.pause();
     audio.src = "";
-    preloadRef.current.src = "";
     setIsPlaying(false);
     setActiveVerseKey(null);
     setActiveWordIndex(null);

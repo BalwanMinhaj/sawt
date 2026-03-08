@@ -15,7 +15,8 @@ const usePlayerStore = create(
       // ─── Quran Data ─────────────────────────────────────────────────────────
       scriptData: null,
       translationData: null,
-      timingsData: null,
+      surahAudioData: null, // { surahNumber: { audio_url, duration } }
+      segmentsData: null, // { verseKey: { timestamp_from, timestamp_to, segments } }
 
       // ─── User Selections ────────────────────────────────────────────────────
       selectedReciter: DEFAULT_RECITER,
@@ -37,7 +38,7 @@ const usePlayerStore = create(
       // ─── UI ─────────────────────────────────────────────────────────────────
       showTranslation: true,
       onboardingDone: false,
-      repeatMode: "off", // "off" | "all"
+      repeatMode: "off",
       playbackSpeed: 1,
       lastPlayedSurah: null,
       lastPlayedVerseKey: null,
@@ -45,18 +46,14 @@ const usePlayerStore = create(
       // ─── Actions ────────────────────────────────────────────────────────────
       setScriptData: (data) => set({ scriptData: data }),
       setTranslationData: (data) => set({ translationData: data }),
-      setTimingsData: (data) => set({ timingsData: data }),
+      setSurahAudioData: (data) => set({ surahAudioData: data }),
+      setSegmentsData: (data) => set({ segmentsData: data }),
 
-      setSelectedReciter: (reciter) => set({ selectedReciter: reciter, timingsData: null }),
+      setSelectedReciter: (reciter) => set({ selectedReciter: reciter, surahAudioData: null, segmentsData: null }),
       setSelectedScript: (script) => set({ selectedScript: script, scriptData: null }),
       setSelectedTranslation: (translation) => set({ selectedTranslation: translation, translationData: null }),
 
-      setCurrentSurah: (surah) =>
-        set({
-          currentSurah: surah,
-          currentVerseKey: `${surah}:1`,
-          activeVerseKey: null,
-        }),
+      setCurrentSurah: (surah) => set({ currentSurah: surah, currentVerseKey: `${surah}:1`, activeVerseKey: null }),
       setCurrentVerseKey: (key) => set({ currentVerseKey: key }),
 
       setIsPlaying: (val) => set({ isPlaying: val }),
@@ -73,7 +70,7 @@ const usePlayerStore = create(
       toggleTranslation: () => set((state) => ({ showTranslation: !state.showTranslation })),
     }),
     {
-      name: "sawt-settings",
+      name: "sawt-settings-v2",
       partialize: (state) => ({
         theme: state.theme,
         selectedReciter: state.selectedReciter,

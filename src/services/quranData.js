@@ -1,5 +1,4 @@
 const cache = {};
-
 const BASE = import.meta.env.BASE_URL;
 
 async function fetchJSON(path) {
@@ -12,58 +11,25 @@ async function fetchJSON(path) {
 }
 
 // ─── Script ───────────────────────────────────────────────────────────────────
-
 export async function loadScript(script) {
   return await fetchJSON(script.file);
 }
 
 // ─── Translation ──────────────────────────────────────────────────────────────
-
 export async function loadTranslation(translation) {
   return await fetchJSON(translation.file);
 }
 
-// ─── Timings ──────────────────────────────────────────────────────────────────
-
-export async function loadTimings(reciter) {
-  return await fetchJSON(reciter.timingFile);
+// ─── Reciter data ─────────────────────────────────────────────────────────────
+export async function loadSurahAudio(reciter) {
+  return await fetchJSON(`${reciter.dir}/surah.json`);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Get all verse_keys for a surah → ["2:1", "2:2", ...]
-export function getSurahVerseKeys(data, surahNumber) {
-  return Object.keys(data).filter((key) => key.startsWith(`${surahNumber}:`));
-}
-
-// Get arabic text for a verse
-export function getVerseText(scriptData, verseKey) {
-  return scriptData[verseKey]?.text ?? "";
-}
-
-// Get translation text for a verse
-export function getVerseTranslation(translationData, verseKey) {
-  return translationData[verseKey]?.t ?? "";
-}
-
-// Get audio URL for a verse
-export function getVerseAudioUrl(timingsData, verseKey) {
-  return timingsData[verseKey]?.audio_url ?? null;
-}
-
-// Get word segments for a verse → [[index, start_ms, end_ms], ...]
-export function getVerseSegments(timingsData, verseKey) {
-  return timingsData[verseKey]?.segments ?? [];
-}
-
-// Get active word index within a verse based on current audio time
-export function getActiveWordIndex(segments, currentTimeMs) {
-  const active = segments.find(([_, start, end]) => currentTimeMs >= start && currentTimeMs < end);
-  return active ? active[0] : null;
+export async function loadSegments(reciter) {
+  return await fetchJSON(`${reciter.dir}/segments.json`);
 }
 
 // ─── Surah List ───────────────────────────────────────────────────────────────
-
 export async function loadSurahs() {
   const res = await fetch("https://api.quran.com/api/v4/chapters?language=en");
   if (!res.ok) throw new Error("Failed to load surah list");
@@ -77,15 +43,53 @@ export async function loadSurahs() {
   }));
 }
 
-/*
-What Each Function Does
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+export function getSurahVerseKeys(scriptData, surahNumber) {
+  return Object.keys(scriptData).filter((key) => key.startsWith(`${surahNumber}:`));
+}
 
-fetchJSON()          → fetches any JSON file, caches it so it's never fetched twice
-loadScript()         → loads Arabic text data
-loadTranslation()    → loads translation data  
-loadTimings()        → loads reciter timing data
-getSurahVerses()     → filters all ayahs for surah 2, 3 etc
-getSurahTranslation()→ same but for translation
-getSurahTimings()    → same but for timings
-getActiveVerse()     → the core sync function — takes currentTime, returns verse_key
-*/
+export function getVerseText(scriptData, verseKey) {
+  return scriptData[verseKey]?.text ?? "";
+}
+
+export function getVerseTranslation(translationData, verseKey) {
+  return translationData[verseKey]?.t ?? "";
+}
+
+// Get surah audio URL from surahAudioData
+export function getSurahAudioUrl(surahAudioData, surahNumber) {
+  return surahAudioData[surahNumber]?.audio_url ?? null;
+}
+
+// Get verse start/end timestamps in the full surah audio (in seconds)
+export function getVerseTimestamp(segmentsData, verseKey) {
+  const verse = segmentsData[verseKey];
+  if (!verse) return null;
+  return {
+    from: verse.timestamp_from / 1000,
+    to: verse.timestamp_to / 1000,
+  };
+}
+
+// Get word segments for a verse
+export function getVerseSegments(segmentsData, verseKey) {
+  return segmentsData[verseKey]?.segments ?? [];
+}
+
+// Get active word index based on current time in full surah audio (ms)
+export function getActiveWordIndex(segments, currentTimeMs) {
+  const active = segments.find(([_, start, end]) => currentTimeMs >= start && currentTimeMs < end);
+  return active ? active[0] : null;
+}
+
+// Get active verse key based on current time in full surah audio (ms)
+export function getActiveVerseKey(segmentsData, surahNumber, currentTimeMs) {
+  const keys = Object.keys(segmentsData).filter((k) => k.startsWith(`${surahNumber}:`));
+  for (const key of keys) {
+    const verse = segmentsData[key];
+    if (currentTimeMs >= verse.timestamp_from && currentTimeMs <= verse.timestamp_to) {
+      return key;
+    }
+  }
+  return null;
+}

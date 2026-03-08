@@ -1,46 +1,43 @@
 import { useEffect } from "react";
 import usePlayerStore from "../store/playerStore";
-import { loadScript, loadTranslation, loadTimings, loadSurahs } from "../services/quranData";
+import { loadScript, loadTranslation, loadSurahAudio, loadSegments, loadSurahs } from "../services/quranData";
 
 export function useQuran() {
-  const { selectedScript, selectedTranslation, selectedReciter, scriptData, translationData, timingsData, setScriptData, setTranslationData, setTimingsData, surahs, setSurahs } = usePlayerStore();
+  const { selectedScript, selectedTranslation, selectedReciter, scriptData, translationData, surahAudioData, segmentsData, setScriptData, setTranslationData, setSurahAudioData, setSegmentsData, surahs, setSurahs } = usePlayerStore();
 
   // Initial load — all in parallel
   useEffect(() => {
     const promises = [];
-
     if (!surahs.length) promises.push(loadSurahs().then(setSurahs));
-
     if (!scriptData) promises.push(loadScript(selectedScript).then(setScriptData));
-
     if (!translationData) promises.push(loadTranslation(selectedTranslation).then(setTranslationData));
-
-    if (!timingsData) promises.push(loadTimings(selectedReciter).then(setTimingsData));
-
-    if (promises.length) {
-      Promise.all(promises).catch((err) => console.error("Load error:", err));
-    }
+    if (!surahAudioData) promises.push(loadSurahAudio(selectedReciter).then(setSurahAudioData));
+    if (!segmentsData) promises.push(loadSegments(selectedReciter).then(setSegmentsData));
+    if (promises.length) Promise.all(promises).catch(console.error);
   }, []);
 
-  // Reload when user changes reciter
+  // Reload when reciter changes
   useEffect(() => {
-    if (timingsData) return;
-    loadTimings(selectedReciter).then(setTimingsData).catch(console.error);
+    if (surahAudioData && segmentsData) return;
+    const promises = [];
+    if (!surahAudioData) promises.push(loadSurahAudio(selectedReciter).then(setSurahAudioData));
+    if (!segmentsData) promises.push(loadSegments(selectedReciter).then(setSegmentsData));
+    if (promises.length) Promise.all(promises).catch(console.error);
   }, [selectedReciter]);
 
-  // Reload when user changes script
+  // Reload when script changes
   useEffect(() => {
     if (scriptData) return;
     loadScript(selectedScript).then(setScriptData).catch(console.error);
   }, [selectedScript]);
 
-  // Reload when user changes translation
+  // Reload when translation changes
   useEffect(() => {
     if (translationData) return;
     loadTranslation(selectedTranslation).then(setTranslationData).catch(console.error);
   }, [selectedTranslation]);
 
   return {
-    isLoading: !scriptData || !translationData || !timingsData || !surahs.length,
+    isLoading: !scriptData || !translationData || !surahAudioData || !segmentsData || !surahs.length,
   };
 }

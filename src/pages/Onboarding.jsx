@@ -3,7 +3,7 @@ import usePlayerStore from "../store/playerStore";
 import { RECITERS } from "../constants/reciters";
 import { SCRIPTS } from "../constants/scripts";
 import { TRANSLATIONS } from "../constants/translations";
-import { loadScript, loadTranslation, loadTimings, loadSurahs } from "../services/quranData";
+import { loadScript, loadTranslation, loadSurahAudio, loadSegments, loadSurahs } from "../services/quranData";
 
 const STEPS = ["reciter", "script", "translation"];
 
@@ -33,7 +33,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 );
 
 function Onboarding() {
-  const { selectedReciter, setSelectedReciter, selectedScript, setSelectedScript, selectedTranslation, setSelectedTranslation, setScriptData, setTranslationData, setTimingsData, setSurahs, setOnboardingDone } = usePlayerStore();
+  const { selectedReciter, setSelectedReciter, selectedScript, setSelectedScript, selectedTranslation, setSelectedTranslation, setScriptData, setTranslationData, setSurahAudioData, setSegmentsData, setSurahs, setOnboardingDone } = usePlayerStore();
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -62,19 +62,23 @@ function Onboarding() {
     const tasks = [
       loadSurahs().then((d) => {
         setSurahs(d);
-        setProgress((p) => p + 25);
+        setProgress((p) => p + 20);
       }),
       loadScript(selectedScript).then((d) => {
         setScriptData(d);
-        setProgress((p) => p + 25);
+        setProgress((p) => p + 20);
       }),
       loadTranslation(selectedTranslation).then((d) => {
         setTranslationData(d);
-        setProgress((p) => p + 25);
+        setProgress((p) => p + 20);
       }),
-      loadTimings(selectedReciter).then((d) => {
-        setTimingsData(d);
-        setProgress((p) => p + 25);
+      loadSurahAudio(selectedReciter).then((d) => {
+        setSurahAudioData(d);
+        setProgress((p) => p + 20);
+      }),
+      loadSegments(selectedReciter).then((d) => {
+        setSegmentsData(d);
+        setProgress((p) => p + 20);
       }),
     ];
     try {
