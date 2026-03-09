@@ -134,6 +134,7 @@ export function useAudio() {
       audio.oncanplay = null;
       audio.src = url;
       audio.preload = "auto";
+      setIsBuffering(true);
 
       audio.oncanplay = () => {
         if (!shouldPlayRef.current) return;
