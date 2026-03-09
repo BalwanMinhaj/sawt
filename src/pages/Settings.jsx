@@ -68,7 +68,7 @@ const CheckIcon = () => (
 );
 
 function Settings() {
-  const { theme, setTheme, showTranslation, toggleTranslation, selectedReciter, setSelectedReciter, selectedTranslation, setSelectedTranslation, selectedScript, setSelectedScript } = usePlayerStore();
+  const { theme, setTheme, showTranslation, toggleTranslation, selectedReciter, setSelectedReciter, selectedTranslation, setSelectedTranslation, selectedScript, setSelectedScript, autoPlayNextSurah, setAutoPlayNextSurah } = usePlayerStore();
 
   const [reciterOpen, setReciterOpen] = useState(false);
   const [translationOpen, setTranslationOpen] = useState(false);
@@ -83,6 +83,7 @@ function Settings() {
         <div style={{ fontFamily: "Lora, serif", fontSize: "26px", letterSpacing: "-.3px", color: "var(--t1)" }}>Settings</div>
       </div>
 
+      {/* Appearance */}
       <div style={{ padding: "20px 22px 0" }}>
         <Label>Appearance</Label>
         <Card>
@@ -93,6 +94,21 @@ function Settings() {
         </Card>
       </div>
 
+      {/* Playback */}
+      <div style={{ padding: "20px 22px 0" }}>
+        <Label>Playback</Label>
+        <Card>
+          <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--t1)" }}>Auto-play Next Surah</div>
+              <div style={{ fontSize: "12px", color: "var(--t2)", marginTop: "2px" }}>Continue to the next surah automatically</div>
+            </div>
+            <Toggle on={autoPlayNextSurah} onClick={() => setAutoPlayNextSurah(!autoPlayNextSurah)} />
+          </div>
+        </Card>
+      </div>
+
+      {/* Arabic Script */}
       <div style={{ padding: "20px 22px 0" }}>
         <Label>Arabic Script</Label>
         <Card>
@@ -105,6 +121,7 @@ function Settings() {
         </Card>
       </div>
 
+      {/* Translation */}
       <div style={{ padding: "20px 22px 0" }}>
         <Label>Translation</Label>
         <Card>
@@ -151,6 +168,7 @@ function Settings() {
         </Card>
       </div>
 
+      {/* Reciter */}
       <div style={{ padding: "20px 22px 0" }}>
         <Label>Reciter</Label>
         <Card>
@@ -191,6 +209,7 @@ function Settings() {
         </Card>
       </div>
 
+      {/* Feedback */}
       <div style={{ padding: "20px 22px 0" }}>
         <Label>Feedback</Label>
         <Card>
@@ -208,7 +227,7 @@ function Settings() {
         </Card>
       </div>
 
-      {/* Attribution */}
+      {/* Credits */}
       <div style={{ padding: "20px 22px 0" }}>
         <Label>Credits</Label>
         <Card>

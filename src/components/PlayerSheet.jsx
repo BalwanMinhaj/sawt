@@ -1,65 +1,40 @@
 import { useRef } from "react";
 import usePlayerStore from "../store/playerStore";
-import { getSurahVerseKeys } from "../services/quranData";
 import VerseList from "./VerseList";
 
-function PlayerSheet({ open, onClose, togglePlay, nextVerse, prevVerse, playVerse }) {
-  const { isPlaying, activeVerseKey, currentSurah, surahs, selectedReciter, progress, duration, totalVerses, scriptData, repeatMode, setRepeatMode, playbackSpeed, setPlaybackSpeed } = usePlayerStore();
+function fmt(sec) {
+  if (!sec || isNaN(sec)) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function PlayerSheet({ open, onClose, togglePlay, nextVerse, prevVerse, playVerse, isBuffering }) {
+  const { isPlaying, activeVerseKey, currentSurah, surahs, selectedReciter, progress, duration, repeatMode, setRepeatMode, playbackSpeed, setPlaybackSpeed } = usePlayerStore();
 
   const surah = surahs.find((s) => s.number === currentSurah);
   const ayahNumber = activeVerseKey?.split(":")[1];
-
-  const progressPct = () => {
-    if (!activeVerseKey || !totalVerses) return 0;
-    const verseIndex = parseInt(ayahNumber) - 1;
-    const within = duration ? progress / duration : 0;
-    return ((verseIndex + within) / totalVerses) * 100;
-  };
+  const progressPct = duration ? (progress / duration) * 100 : 0;
 
   const handleSeek = (e) => {
-    if (!scriptData || !totalVerses) return;
+    if (!duration) return;
     const bar = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - bar.left) / bar.width));
-    const target = pct * totalVerses;
-    const idx = Math.floor(target);
-    const within = target - idx;
-    const keys = getSurahVerseKeys(scriptData, currentSurah);
-    const key = keys[Math.min(idx, keys.length - 1)];
-    if (key) playVerse(key, within);
+    playVerse(activeVerseKey || `${currentSurah}:1`, pct);
   };
 
   const cycleRepeat = () => setRepeatMode(repeatMode === "off" ? "all" : "off");
-
   const speeds = [0.75, 1, 1.25, 1.5];
   const cycleSpeed = () => {
     const idx = speeds.indexOf(playbackSpeed);
     setPlaybackSpeed(speeds[(idx + 1) % speeds.length]);
   };
 
-  const RepeatIcon = () => (
-    <svg width="20" height="20" fill="none" stroke={repeatMode === "all" ? "var(--accent)" : "var(--t2)"} strokeWidth="1.8" viewBox="0 0 24 24">
-      <polyline points="17 1 21 5 17 9" />
-      <path d="M3 11V9a4 4 0 014-4h14" />
-      <polyline points="7 23 3 19 7 15" />
-      <path d="M21 13v2a4 4 0 01-4 4H3" />
-    </svg>
-  );
-
   const touchStart = useRef(0);
 
   return (
     <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 30,
-        background: "var(--bg)",
-        display: "flex",
-        flexDirection: "column",
-        transform: open ? "translateY(0)" : "translateY(100%)",
-        transition: "transform .38s cubic-bezier(.32,.72,0,1)",
-        paddingTop: "var(--st)",
-      }}
+      style={{ position: "absolute", inset: 0, zIndex: 30, background: "var(--bg)", display: "flex", flexDirection: "column", transform: open ? "translateY(0)" : "translateY(100%)", transition: "transform .38s cubic-bezier(.32,.72,0,1)", paddingTop: "var(--st)" }}
       onTouchStart={(e) => {
         touchStart.current = e.touches[0].clientY;
       }}
@@ -94,33 +69,24 @@ function PlayerSheet({ open, onClose, togglePlay, nextVerse, prevVerse, playVers
         {/* Progress */}
         <div style={{ marginBottom: "10px" }}>
           <div onClick={handleSeek} style={{ height: "2px", background: "var(--surface-3)", borderRadius: "2px", cursor: "pointer" }}>
-            <div style={{ height: "100%", background: "var(--accent)", borderRadius: "2px", width: `${progressPct()}%`, transition: "width .1s linear" }} />
+            <div style={{ height: "100%", background: "var(--accent)", borderRadius: "2px", width: `${progressPct}%`, transition: "width .1s linear" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--t3)", marginTop: "5px" }}>
-            <span>{activeVerseKey ? `Verse ${ayahNumber}` : "—"}</span>
-            <span>{totalVerses} verses</span>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(progress)}</span>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(duration)}</span>
           </div>
         </div>
 
         {/* Buttons */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
           {/* Repeat */}
-          <button
-            onClick={cycleRepeat}
-            style={{
-              border: "none",
-              cursor: "pointer",
-              width: "46px",
-              height: "46px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: repeatMode !== "off" ? "var(--accent-s)" : "none",
-              transition: "background .15s",
-            }}
-          >
-            <RepeatIcon />
+          <button onClick={cycleRepeat} style={{ border: "none", cursor: "pointer", width: "46px", height: "46px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: repeatMode !== "off" ? "var(--accent-s)" : "none", transition: "background .15s" }}>
+            <svg width="20" height="20" fill="none" stroke={repeatMode === "all" ? "var(--accent)" : "var(--t2)"} strokeWidth="1.8" viewBox="0 0 24 24">
+              <polyline points="17 1 21 5 17 9" />
+              <path d="M3 11V9a4 4 0 014-4h14" />
+              <polyline points="7 23 3 19 7 15" />
+              <path d="M21 13v2a4 4 0 01-4 4H3" />
+            </svg>
           </button>
 
           {/* Prev */}
@@ -131,23 +97,10 @@ function PlayerSheet({ open, onClose, togglePlay, nextVerse, prevVerse, playVers
           </button>
 
           {/* Play/Pause */}
-          <button
-            onClick={togglePlay}
-            style={{
-              width: "56px",
-              height: "56px",
-              borderRadius: "50%",
-              background: "var(--accent)",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 18px var(--accent-m)",
-            }}
-          >
-            {isPlaying ? (
+          <button onClick={togglePlay} style={{ width: "56px", height: "56px", borderRadius: "50%", background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 18px var(--accent-m)" }}>
+            {isBuffering ? (
+              <div style={{ width: "22px", height: "22px", border: "2.5px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin .75s linear infinite" }} />
+            ) : isPlaying ? (
               <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
               </svg>
@@ -166,31 +119,8 @@ function PlayerSheet({ open, onClose, togglePlay, nextVerse, prevVerse, playVers
           </button>
 
           {/* Speed */}
-          <button
-            onClick={cycleSpeed}
-            style={{
-              border: "none",
-              cursor: "pointer",
-              width: "46px",
-              height: "46px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: playbackSpeed !== 1 ? "var(--accent-s)" : "none",
-              transition: "background .15s",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                letterSpacing: "-.3px",
-                color: playbackSpeed !== 1 ? "var(--accent)" : "var(--t2)",
-              }}
-            >
-              {playbackSpeed}x
-            </span>
+          <button onClick={cycleSpeed} style={{ border: "none", cursor: "pointer", width: "46px", height: "46px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: playbackSpeed !== 1 ? "var(--accent-s)" : "none", transition: "background .15s" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "-.3px", color: playbackSpeed !== 1 ? "var(--accent)" : "var(--t2)" }}>{playbackSpeed}x</span>
           </button>
         </div>
       </div>

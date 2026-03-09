@@ -13,8 +13,8 @@ import { getSurahVerseKeys } from "./services/quranData";
 
 function App() {
   const { isLoading } = useQuran();
-  const { setCurrentSurah, theme, onboardingDone, lastPlayedSurah, lastPlayedVerseKey, surahs, scriptData } = usePlayerStore();
-  const { togglePlay, nextVerse, prevVerse, playVerse } = useAudio();
+  const { setCurrentSurah, theme, onboardingDone, lastPlayedSurah, lastPlayedVerseKey, surahs, scriptData, selectedReciter } = usePlayerStore();
+  const { togglePlay, nextVerse, prevVerse, playVerse, isBuffering } = useAudio();
   const [tab, setTab] = useState("home");
   const [playerOpen, setPlayerOpen] = useState(false);
   const [showResume, setShowResume] = useState(false);
@@ -30,7 +30,11 @@ function App() {
     if (lastPlayedVerseKey) setShowResume(true);
   }, []);
 
-  // Capture browser install prompt
+  // Close player when reciter changes
+  useEffect(() => {
+    setPlayerOpen(false);
+  }, [selectedReciter]);
+
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault();
@@ -40,7 +44,6 @@ function App() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // Show install prompt after onboarding completes
   useEffect(() => {
     const handler = () => {
       if (installPrompt) setShowInstall(true);
@@ -80,9 +83,11 @@ function App() {
 
   return (
     <div style={{ position: "fixed", inset: 0, maxWidth: "460px", margin: "0 auto", overflow: "hidden" }}>
-      <style>{`@keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: none; opacity: 1 } }`}</style>
+      <style>{`
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: none; opacity: 1 } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+      `}</style>
 
-      {/* Pages */}
       {["home", "search", "settings"].map((pageId) => (
         <div
           key={pageId}
@@ -110,24 +115,7 @@ function App() {
 
       {/* Install prompt */}
       {showInstall && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "calc(var(--nav-h) + var(--sb) + 12px)",
-            left: "12px",
-            right: "12px",
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--r)",
-            padding: "14px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            zIndex: 25,
-            boxShadow: "0 4px 24px rgba(0,0,0,.12)",
-            animation: "slideUp .3s ease",
-          }}
-        >
+        <div style={{ position: "absolute", bottom: "calc(var(--nav-h) + var(--sb) + 12px)", left: "12px", right: "12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", zIndex: 25, boxShadow: "0 4px 24px rgba(0,0,0,.12)", animation: "slideUp .3s ease" }}>
           <div style={{ fontSize: "28px" }}>📲</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--t1)" }}>Install Sawt</div>
@@ -153,24 +141,7 @@ function App() {
 
       {/* Resume prompt */}
       {showResume && !showInstall && lastPlayedVerseKey && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "calc(var(--nav-h) + var(--sb) + 12px)",
-            left: "12px",
-            right: "12px",
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--r)",
-            padding: "14px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            zIndex: 25,
-            boxShadow: "0 4px 24px rgba(0,0,0,.12)",
-            animation: "slideUp .3s ease",
-          }}
-        >
+        <div style={{ position: "absolute", bottom: "calc(var(--nav-h) + var(--sb) + 12px)", left: "12px", right: "12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", zIndex: 25, boxShadow: "0 4px 24px rgba(0,0,0,.12)", animation: "slideUp .3s ease" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "12px", color: "var(--t3)", marginBottom: "2px" }}>Continue where you left off</div>
             <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--t1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -189,14 +160,9 @@ function App() {
         </div>
       )}
 
-      {/* Mini Player */}
-      <MiniPlayer onOpen={() => setPlayerOpen(true)} togglePlay={togglePlay} nextVerse={nextVerse} />
-
-      {/* Bottom Nav */}
+      <MiniPlayer onOpen={() => setPlayerOpen(true)} togglePlay={togglePlay} nextVerse={nextVerse} prevVerse={prevVerse} isBuffering={isBuffering} />
       <BottomNav active={tab} onChange={setTab} />
-
-      {/* Full Player Sheet */}
-      <PlayerSheet open={playerOpen} onClose={() => setPlayerOpen(false)} togglePlay={togglePlay} nextVerse={nextVerse} prevVerse={prevVerse} playVerse={playVerse} />
+      <PlayerSheet open={playerOpen} onClose={() => setPlayerOpen(false)} togglePlay={togglePlay} nextVerse={nextVerse} prevVerse={prevVerse} playVerse={playVerse} isBuffering={isBuffering} />
     </div>
   );
 }

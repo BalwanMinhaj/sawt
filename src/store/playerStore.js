@@ -12,22 +12,18 @@ const usePlayerStore = create(
       surahs: [],
       setSurahs: (surahs) => set({ surahs }),
 
-      // ─── Quran Data ─────────────────────────────────────────────────────────
       scriptData: null,
       translationData: null,
-      surahAudioData: null, // { surahNumber: { audio_url, duration } }
-      segmentsData: null, // { verseKey: { timestamp_from, timestamp_to, segments } }
+      surahAudioData: null,
+      segmentsData: null,
 
-      // ─── User Selections ────────────────────────────────────────────────────
       selectedReciter: DEFAULT_RECITER,
       selectedScript: DEFAULT_SCRIPT,
       selectedTranslation: DEFAULT_TRANSLATION,
 
-      // ─── Navigation ─────────────────────────────────────────────────────────
       currentSurah: 1,
       currentVerseKey: "1:1",
 
-      // ─── Playback ───────────────────────────────────────────────────────────
       isPlaying: false,
       activeVerseKey: null,
       activeWordIndex: null,
@@ -35,15 +31,14 @@ const usePlayerStore = create(
       duration: 0,
       totalVerses: 0,
 
-      // ─── UI ─────────────────────────────────────────────────────────────────
       showTranslation: true,
       onboardingDone: false,
       repeatMode: "off",
       playbackSpeed: 1,
       lastPlayedSurah: null,
       lastPlayedVerseKey: null,
+      autoPlayNextSurah: true,
 
-      // ─── Actions ────────────────────────────────────────────────────────────
       setScriptData: (data) => set({ scriptData: data }),
       setTranslationData: (data) => set({ translationData: data }),
       setSurahAudioData: (data) => set({ surahAudioData: data }),
@@ -68,6 +63,7 @@ const usePlayerStore = create(
       setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
       setLastPlayed: (surah, verseKey) => set({ lastPlayedSurah: surah, lastPlayedVerseKey: verseKey }),
       toggleTranslation: () => set((state) => ({ showTranslation: !state.showTranslation })),
+      setAutoPlayNextSurah: (val) => set({ autoPlayNextSurah: val }),
     }),
     {
       name: "sawt-settings-v2",
@@ -82,6 +78,7 @@ const usePlayerStore = create(
         playbackSpeed: state.playbackSpeed,
         lastPlayedSurah: state.lastPlayedSurah,
         lastPlayedVerseKey: state.lastPlayedVerseKey,
+        autoPlayNextSurah: state.autoPlayNextSurah,
       }),
     },
   ),
